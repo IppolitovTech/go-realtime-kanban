@@ -146,6 +146,34 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+    patch:
+      summary: Обновить доску (название)
+      operationId: updateBoard
+      security:
+        - BearerAuth: []
+        - DevUserIdHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBoardRequest"
+      responses:
+        "200":
+          description: Доска обновлена
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Board"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
     delete:
       summary: Удалить доску
       operationId: deleteBoard
@@ -234,7 +262,7 @@ paths:
       - $ref: "#/components/parameters/ColumnIdParam"
 
     patch:
-      summary: Обновить колонку (название/порядок)
+      summary: Обновить колонку (название)
       operationId: updateColumn
       security:
         - BearerAuth: []
@@ -268,6 +296,40 @@ paths:
       responses:
         "204":
           description: Колонка удалена
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /columns/{columnId}/move:
+    parameters:
+      - $ref: "#/components/parameters/ColumnIdParam"
+
+    patch:
+      summary: Переместить колонку (drag-n-drop внутри доски)
+      description: |
+        Вычисляет новый `order_num` согласно ADR 004 (среднее между `prev`
+        и `next` под advisory lock'ом доски) — та же схема, что и
+        `PATCH /cards/{cardId}/move`, колонки не переносятся между досками.
+      operationId: moveColumn
+      security:
+        - BearerAuth: []
+        - DevUserIdHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MoveColumnRequest"
+      responses:
+        "200":
+          description: Колонка успешно перемещена
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Column"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -586,6 +648,17 @@ components:
           maxLength: 100
           example: "Проект Kanban Board"
 
+    UpdateBoardRequest:
+      type: object
+      required:
+        - title
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: "Проект Kanban Board v2"
+
     BoardMember:
       type: object
       required:
@@ -674,13 +747,26 @@ components:
 
     UpdateColumnRequest:
       type: object
+      required:
+        - title
       properties:
         title:
           type: string
           minLength: 1
-        order_num:
-          type: number
-          format: double
+
+    MoveColumnRequest:
+      type: object
+      properties:
+        prev_column_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: "ID колонки, СРАЗУ ПОСЛЕ которой вставляем (null, если вставляем в самое начало)"
+        next_column_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: "ID колонки, СРАЗУ ПЕРЕД которой вставляем (null, если вставляем в самый конец)"
 
     Card:
       type: object

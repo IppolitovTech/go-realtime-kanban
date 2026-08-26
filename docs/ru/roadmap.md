@@ -53,9 +53,9 @@ end-to-end работающую вертикаль (фронт → бэк → Б
 (появляется middleware, кладущий реальный `userID` в `context`), а
 domain/service/repository не переписываются задним числом.
 
-- [ ] Domain-модели: User (заглушка), Board, Column, Card — order-поле
+- [x] Domain-модели: User (заглушка), Board, Column, Card — order-поле
       реализовано согласно ADR 004
-- [ ] Repository-слой для Board/Column/Card: sqlc-запросы в
+- [x] Repository-слой для Board/Column/Card: sqlc-запросы в
       `internal/repository/postgres/queries/*.sql` + ручные Go-интерфейсы
       поверх сгенерированного кода (интерфейсы — точка для моков в тестах)
 - [ ] Service-слой с базовой бизнес-логикой (например, порядок колонок/карточек), сигнатуры методов принимают `userID`
