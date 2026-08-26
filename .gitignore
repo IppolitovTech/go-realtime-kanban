@@ -1,0 +1,6 @@
+/bin/
+*.exe
+*.test
+*.out
+.env
+CLAUDE.local.md

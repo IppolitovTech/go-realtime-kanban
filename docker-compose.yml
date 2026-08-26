@@ -1,0 +1,53 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: kanban
+      POSTGRES_PASSWORD: kanban
+      POSTGRES_DB: kanban
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kanban -d kanban"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://kanban:kanban@postgres:5432/kanban?sslmode=disable
+      HTTP_ADDR: ":8080"
+    ports:
+      - "${API_PORT:-8080}:8080"
+
+  migrate:
+    image: migrate/migrate:v4.17.1
+    profiles: ["tools"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./internal/repository/postgres/migrations:/migrations
+    entrypoint:
+      - migrate
+      - -path=/migrations
+      - -database=postgres://kanban:kanban@postgres:5432/kanban?sslmode=disable
+
+  sqlc:
+    image: sqlc/sqlc:1.27.0
+    profiles: ["tools"]
+    working_dir: /src
+    volumes:
+      - .:/src
+    entrypoint: ["sqlc"]
+
+volumes:
+  postgres_data:

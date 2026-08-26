@@ -29,15 +29,15 @@ end-to-end работающую вертикаль (фронт → бэк → Б
 ## Этап 0 — Скелет проекта
 **Цель:** пустой, но полностью настроенный проект, который можно запустить.
 
-- [ ] Инициализировать Go-модуль, структура папок (`cmd/`, `internal/domain`, `internal/service`, `internal/repository`, `internal/transport/http`)
-- [ ] Базовый HTTP-сервер на chi + `GET /health` (заглушка `{"status":"ok"}`) + helper для JSON-ответов (`respond.go`)
-- [ ] Поднять Postgres в Docker Compose
-- [ ] Подключение к БД из Go через `pgx` (расширить `/health` — проверка соединения с БД) — см. ADR 003
-- [ ] Настроить golang-migrate, первая пустая миграция
-- [ ] Настроить sqlc (`sqlc.yaml`, пустой `queries/`-каталог, `go generate` в Makefile) — см. ADR 003
-- [ ] Единый Makefile-таск (`make db-sync` или аналог: `migrate up && sqlc generate`), чтобы схема Postgres и сгенерированный sqlc-код не расходились ни локально, ни в CI
-- [ ] `vision.md`, `roadmap.md`, `adr/` в репозитории
-- [ ] Базовый README (как запустить)
+- [x] Инициализировать Go-модуль, структура папок (`cmd/`, `internal/domain`, `internal/service`, `internal/repository`, `internal/transport/http`)
+- [x] Базовый HTTP-сервер на chi + `GET /health` (заглушка `{"status":"ok"}`) + helper для JSON-ответов (`respond.go`)
+- [x] Поднять Postgres в Docker Compose
+- [x] Подключение к БД из Go через `pgx` (расширить `/health` — проверка соединения с БД) — см. ADR 003
+- [x] Настроить golang-migrate, первая пустая миграция
+- [x] Настроить sqlc (`sqlc.yaml`, пустой `queries/`-каталог, `sqlc generate` через Makefile) — см. ADR 003
+- [x] Единый Makefile-таск (`make db-sync`: `migrate up && sqlc generate`), чтобы схема Postgres и сгенерированный sqlc-код не расходились ни локально, ни в CI
+- [x] `vision.md`, `roadmap.md`, `adr/` в репозитории
+- [x] Базовый README (как запустить)
 
 **Результат:** `docker compose up` → `curl localhost:8080/health` → `{"status":"ok"}`
 

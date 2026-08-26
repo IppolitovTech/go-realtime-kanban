@@ -1,0 +1,2 @@
+-- Intentionally empty: first migration exists to prove the migrate
+-- toolchain is wired up end-to-end (Этап 0). Schema lands in Этап 1.
