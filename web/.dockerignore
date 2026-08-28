@@ -1,0 +1,5 @@
+# Host-installed deps and build output shouldn't leak into the image:
+# node_modules may be built for the host OS (incompatible with the
+# node:22-alpine container) and dist is unused by the dev server.
+node_modules
+dist

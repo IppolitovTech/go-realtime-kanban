@@ -1,10 +1,18 @@
-.PHONY: up down migrate-up migrate-down sqlc-generate db-sync run test test-integration
+.PHONY: up down dev dev-backend migrate-up migrate-down sqlc-generate db-sync run test test-integration
 
 up:
 	docker compose up -d postgres
 
 down:
 	docker compose down
+
+# Whole stack in one command: Postgres, migrations, API, frontend.
+dev:
+	docker compose up --build
+
+# Same, minus the frontend container — run `npm run dev` in web/ yourself.
+dev-backend:
+	docker compose up --build postgres api migrate
 
 migrate-up:
 	docker compose run --rm migrate up

@@ -1,0 +1,16 @@
+# Version control
+.git
+.gitignore
+
+# Frontend: has its own build context (web/Dockerfile.dev), not needed
+# for the Go api image and node_modules is huge / host-specific.
+web/node_modules
+web/dist
+
+# Local env/config, never bake secrets into an image layer
+.env
+.env.*
+
+# Docs and other non-build inputs
+docs
+README.md

@@ -25,11 +25,15 @@ make run            # start the API server on :8080
 curl localhost:8080/health
 ```
 
-Or build the whole stack (Postgres + API) in containers:
+Or run the whole stack (Postgres + migrations + API + frontend) in containers:
 
 ```sh
-docker compose up --build
+make dev             # same as: docker compose up --build
 ```
+
+This starts the API on `localhost:8080` (or `$API_PORT`) and the frontend
+on `localhost:5173` (or `$WEB_PORT`), with migrations applied automatically
+before the API starts.
 
 Run tests:
 

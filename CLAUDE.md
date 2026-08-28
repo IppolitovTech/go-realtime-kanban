@@ -26,8 +26,8 @@ not duplicated here.
 ## Stack
 
 Go (`net/http` + chi, see ADR 001) · PostgreSQL + sqlc + pgx (ADR 003)
-· `coder/websocket` for real-time (ADR 002) · React + dnd-kit on the
-frontend · Docker Compose.
+· `coder/websocket` for real-time (ADR 002) · React + dnd-kit + Tailwind
+CSS on the frontend · Docker Compose.
 
 ## How to run / verify
 

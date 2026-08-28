@@ -110,7 +110,7 @@ roadmap сознательно реализует CRUD **без** авториз
 ## Технологический стек (кратко)
 
 - **Backend**: Go, chi (роутинг, см. ADR 001), `coder/websocket` для real-time (см. ADR 002), PostgreSQL + sqlc + pgx (см. ADR 003), golang-migrate
-- **Frontend**: React, dnd-kit, обычный fetch/WebSocket клиент
+- **Frontend**: React, dnd-kit, Tailwind CSS, обычный fetch/WebSocket клиент
 - **Инфраструктура**: Docker Compose (app + Postgres), GitHub Actions (тесты + `go test -race` в CI)
 
 *Про разделение ролей REST (команды) и WebSocket (push-уведомления) —

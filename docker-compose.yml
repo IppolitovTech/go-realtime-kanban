@@ -20,17 +20,35 @@ services:
       context: .
       dockerfile: Dockerfile
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     environment:
       DATABASE_URL: postgres://kanban:kanban@postgres:5432/kanban?sslmode=disable
       HTTP_ADDR: ":8080"
     ports:
       - "${API_PORT:-8080}:8080"
 
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile.dev
+    depends_on:
+      - api
+    environment:
+      VITE_API_BASE_URL: "http://localhost:${API_PORT:-8080}/api/v1"
+    ports:
+      - "${WEB_PORT:-5173}:5173"
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+
+  # Runs migrations to the latest version once, on every `docker compose up`
+  # (the api service waits on it) — see the api service's depends_on above.
+  # `make migrate-up`/`make migrate-down` override the default command for
+  # manual, one-off use.
   migrate:
     image: migrate/migrate:v4.17.1
-    profiles: ["tools"]
+    command: ["up"]
     depends_on:
       postgres:
         condition: service_healthy
