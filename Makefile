@@ -1,4 +1,4 @@
-.PHONY: up down migrate-up migrate-down sqlc-generate db-sync run test
+.PHONY: up down migrate-up migrate-down sqlc-generate db-sync run test test-integration
 
 up:
 	docker compose up -d postgres
@@ -22,3 +22,8 @@ run:
 
 test:
 	go test -race ./...
+
+# Requires `make up` (Postgres reachable on localhost:5432) — see ADR 004
+# and roadmap.md, Stage 1, for what these cover.
+test-integration:
+	go test -race -tags=integration ./internal/service/...

@@ -47,7 +47,7 @@ services:
     working_dir: /src
     volumes:
       - .:/src
-    entrypoint: ["sqlc"]
+    entrypoint: ["/workspace/sqlc"]
 
 volumes:
   postgres_data:
