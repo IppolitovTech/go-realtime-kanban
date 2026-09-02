@@ -21,6 +21,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/IppolitovTech/go-realtime-kanban/internal/domain"
+	"github.com/IppolitovTech/go-realtime-kanban/internal/realtime"
 	"github.com/IppolitovTech/go-realtime-kanban/internal/repository/postgres"
 	"github.com/IppolitovTech/go-realtime-kanban/internal/service"
 )
@@ -59,8 +60,8 @@ func newIntegrationFixture(t *testing.T) (cards *service.CardService, cardRepo *
 	tx := postgres.NewTxManager(pool)
 
 	boardSvc := service.NewBoardService(boardRepo, userRepo, tx)
-	columnSvc := service.NewColumnService(columnRepo, boardRepo, tx)
-	cardSvc := service.NewCardService(cardRepo, columnRepo, boardRepo, tx)
+	columnSvc := service.NewColumnService(columnRepo, boardRepo, tx, realtime.NoopPublisher{})
+	cardSvc := service.NewCardService(cardRepo, columnRepo, boardRepo, tx, realtime.NoopPublisher{})
 
 	board, err := boardSvc.Create(ctx, stubUserID, "Integration test board")
 	if err != nil {

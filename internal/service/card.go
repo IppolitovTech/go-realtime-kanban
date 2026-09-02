@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/IppolitovTech/go-realtime-kanban/internal/domain"
+	"github.com/IppolitovTech/go-realtime-kanban/internal/realtime"
 	"github.com/IppolitovTech/go-realtime-kanban/internal/repository"
 )
 
@@ -13,16 +14,19 @@ const cardTitleMaxLen = 255
 
 // CardService holds card business logic: membership gating (resolved via
 // the card's/column's board) plus order_num placement/reordering per ADR
-// 004.
+// 004. Every mutation publishes a realtime event after it commits — see
+// ColumnService's doc comment for why that lives here rather than in the
+// hub.
 type CardService struct {
-	cards   repository.CardRepository
-	columns repository.ColumnRepository
-	boards  repository.BoardRepository
-	tx      repository.TxManager
+	cards     repository.CardRepository
+	columns   repository.ColumnRepository
+	boards    repository.BoardRepository
+	tx        repository.TxManager
+	publisher realtime.Publisher
 }
 
-func NewCardService(cards repository.CardRepository, columns repository.ColumnRepository, boards repository.BoardRepository, tx repository.TxManager) *CardService {
-	return &CardService{cards: cards, columns: columns, boards: boards, tx: tx}
+func NewCardService(cards repository.CardRepository, columns repository.ColumnRepository, boards repository.BoardRepository, tx repository.TxManager, publisher realtime.Publisher) *CardService {
+	return &CardService{cards: cards, columns: columns, boards: boards, tx: tx, publisher: publisher}
 }
 
 func (s *CardService) requireColumnMember(ctx context.Context, userID, columnID uuid.UUID) (domain.Column, error) {
@@ -37,7 +41,8 @@ func (s *CardService) requireColumnMember(ctx context.Context, userID, columnID 
 }
 
 func (s *CardService) Create(ctx context.Context, userID, columnID uuid.UUID, title, description string) (domain.Card, error) {
-	if _, err := s.requireColumnMember(ctx, userID, columnID); err != nil {
+	column, err := s.requireColumnMember(ctx, userID, columnID)
+	if err != nil {
 		return domain.Card{}, err
 	}
 	if err := validateTitle("title", title, cardTitleMaxLen); err != nil {
@@ -45,7 +50,7 @@ func (s *CardService) Create(ctx context.Context, userID, columnID uuid.UUID, ti
 	}
 
 	var card domain.Card
-	err := s.tx.WithinTx(ctx, func(ctx context.Context) error {
+	err = s.tx.WithinTx(ctx, func(ctx context.Context) error {
 		if err := s.cards.LockForReorder(ctx, columnID); err != nil {
 			return err
 		}
@@ -65,6 +70,7 @@ func (s *CardService) Create(ctx context.Context, userID, columnID uuid.UUID, ti
 	if err != nil {
 		return domain.Card{}, err
 	}
+	s.publisher.Publish(ctx, realtime.NewEvent(realtime.EventCardCreated, column.BoardID, realtime.NewCardPayload(card)))
 	return card, nil
 }
 
@@ -94,7 +100,8 @@ func (s *CardService) UpdateContent(ctx context.Context, userID, cardID uuid.UUI
 	if err != nil {
 		return domain.Card{}, err
 	}
-	if _, err := s.requireColumnMember(ctx, userID, card.ColumnID); err != nil {
+	column, err := s.requireColumnMember(ctx, userID, card.ColumnID)
+	if err != nil {
 		return domain.Card{}, err
 	}
 
@@ -109,7 +116,12 @@ func (s *CardService) UpdateContent(ctx context.Context, userID, cardID uuid.UUI
 	if err := validateTitle("title", newTitle, cardTitleMaxLen); err != nil {
 		return domain.Card{}, err
 	}
-	return s.cards.UpdateContent(ctx, cardID, newTitle, newDescription)
+	updated, err := s.cards.UpdateContent(ctx, cardID, newTitle, newDescription)
+	if err != nil {
+		return domain.Card{}, err
+	}
+	s.publisher.Publish(ctx, realtime.NewEvent(realtime.EventCardUpdated, column.BoardID, realtime.NewCardPayload(updated)))
+	return updated, nil
 }
 
 func (s *CardService) Delete(ctx context.Context, userID, cardID uuid.UUID) error {
@@ -117,10 +129,15 @@ func (s *CardService) Delete(ctx context.Context, userID, cardID uuid.UUID) erro
 	if err != nil {
 		return err
 	}
-	if _, err := s.requireColumnMember(ctx, userID, card.ColumnID); err != nil {
+	column, err := s.requireColumnMember(ctx, userID, card.ColumnID)
+	if err != nil {
 		return err
 	}
-	return s.cards.Delete(ctx, cardID)
+	if err := s.cards.Delete(ctx, cardID); err != nil {
+		return err
+	}
+	s.publisher.Publish(ctx, realtime.NewEvent(realtime.EventCardDeleted, column.BoardID, realtime.NewCardPayload(card)))
+	return nil
 }
 
 // Move relocates a card into targetColumnID (which may equal its current
@@ -208,5 +225,6 @@ func (s *CardService) Move(ctx context.Context, userID, cardID, targetColumnID u
 	if err != nil {
 		return domain.Card{}, err
 	}
+	s.publisher.Publish(ctx, realtime.NewEvent(realtime.EventCardMoved, targetColumn.BoardID, realtime.NewCardPayload(moved)))
 	return moved, nil
 }

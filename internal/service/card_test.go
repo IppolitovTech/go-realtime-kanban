@@ -9,13 +9,14 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/IppolitovTech/go-realtime-kanban/internal/domain"
+	"github.com/IppolitovTech/go-realtime-kanban/internal/realtime"
 )
 
 func newCardServiceForTest() (*CardService, *memCardRepo, *memColumnRepo, *memBoardRepo) {
 	cards := newMemCardRepo()
 	columns := newMemColumnRepo()
 	boards := newMemBoardRepo()
-	return NewCardService(cards, columns, boards, memTxManager{}), cards, columns, boards
+	return NewCardService(cards, columns, boards, memTxManager{}, realtime.NoopPublisher{}), cards, columns, boards
 }
 
 func TestCardService_Create(t *testing.T) {

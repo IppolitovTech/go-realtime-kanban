@@ -6,25 +6,16 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/IppolitovTech/go-realtime-kanban/internal/domain"
+	"github.com/IppolitovTech/go-realtime-kanban/internal/realtime"
 	"github.com/IppolitovTech/go-realtime-kanban/internal/service"
 )
 
-type columnResponse struct {
-	ID        uuid.UUID `json:"id"`
-	BoardID   uuid.UUID `json:"board_id"`
-	Title     string    `json:"title"`
-	OrderNum  float64   `json:"order_num"`
-	CreatedAt string    `json:"created_at"`
-}
+// columnResponse is realtime.ColumnPayload under a transport-local name —
+// see the matching comment on cardResponse in card.go.
+type columnResponse = realtime.ColumnPayload
 
 func newColumnResponse(c domain.Column) columnResponse {
-	return columnResponse{
-		ID:        c.ID,
-		BoardID:   c.BoardID,
-		Title:     c.Title,
-		OrderNum:  c.OrderNum,
-		CreatedAt: c.CreatedAt.Format(timeFormat),
-	}
+	return realtime.NewColumnPayload(c)
 }
 
 type columnDetailResponse struct {

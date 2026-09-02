@@ -6,29 +6,18 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/IppolitovTech/go-realtime-kanban/internal/domain"
+	"github.com/IppolitovTech/go-realtime-kanban/internal/realtime"
 	"github.com/IppolitovTech/go-realtime-kanban/internal/service"
 )
 
-type cardResponse struct {
-	ID          uuid.UUID `json:"id"`
-	ColumnID    uuid.UUID `json:"column_id"`
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
-	OrderNum    float64   `json:"order_num"`
-	AuthorID    uuid.UUID `json:"author_id"`
-	CreatedAt   string    `json:"created_at"`
-}
+// cardResponse is realtime.CardPayload under a transport-local name — the
+// REST and WS responses for a card are the same shape on purpose (see
+// docs/ru/websocket-events.md), so this reuses that type instead of
+// hand-maintaining a second copy of its fields.
+type cardResponse = realtime.CardPayload
 
 func newCardResponse(c domain.Card) cardResponse {
-	return cardResponse{
-		ID:          c.ID,
-		ColumnID:    c.ColumnID,
-		Title:       c.Title,
-		Description: c.Description,
-		OrderNum:    c.OrderNum,
-		AuthorID:    c.AuthorID,
-		CreatedAt:   c.CreatedAt.Format(timeFormat),
-	}
+	return realtime.NewCardPayload(c)
 }
 
 type createCardRequest struct {

@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/IppolitovTech/go-realtime-kanban/internal/domain"
+	"github.com/IppolitovTech/go-realtime-kanban/internal/realtime"
 )
 
 // testBoard wires up a board+member pair directly against the mock repos,
@@ -29,7 +30,7 @@ func testBoard(t *testing.T, boards *memBoardRepo, userID uuid.UUID) domain.Boar
 func newColumnServiceForTest() (*ColumnService, *memColumnRepo, *memBoardRepo) {
 	columns := newMemColumnRepo()
 	boards := newMemBoardRepo()
-	return NewColumnService(columns, boards, memTxManager{}), columns, boards
+	return NewColumnService(columns, boards, memTxManager{}, realtime.NoopPublisher{}), columns, boards
 }
 
 func TestColumnService_Create(t *testing.T) {

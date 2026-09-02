@@ -15,6 +15,7 @@ import (
 	"github.com/go-chi/cors"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/IppolitovTech/go-realtime-kanban/internal/realtime"
 	"github.com/IppolitovTech/go-realtime-kanban/internal/repository/postgres"
 	"github.com/IppolitovTech/go-realtime-kanban/internal/service"
 	transporthttp "github.com/IppolitovTech/go-realtime-kanban/internal/transport/http"
@@ -51,13 +52,21 @@ func run() error {
 	userRepo := postgres.NewUserRepository(pool)
 	txManager := postgres.NewTxManager(pool)
 
+	hub := realtime.NewHub()
+	hubDone := make(chan struct{})
+	go func() {
+		defer close(hubDone)
+		hub.Run(ctx)
+	}()
+
 	boardService := service.NewBoardService(boardRepo, userRepo, txManager)
-	columnService := service.NewColumnService(columnRepo, boardRepo, txManager)
-	cardService := service.NewCardService(cardRepo, columnRepo, boardRepo, txManager)
+	columnService := service.NewColumnService(columnRepo, boardRepo, txManager, hub)
+	cardService := service.NewCardService(cardRepo, columnRepo, boardRepo, txManager, hub)
 
 	boardHandler := transporthttp.NewBoardHandler(boardService, columnService, cardService)
 	columnHandler := transporthttp.NewColumnHandler(columnService)
 	cardHandler := transporthttp.NewCardHandler(cardService)
+	wsHandler := transporthttp.NewWSHandler(ctx, boardService, hub, corsAllowedOrigins())
 
 	router := chi.NewRouter()
 	router.Use(cors.Handler(cors.Options{
@@ -87,6 +96,7 @@ func run() error {
 					r.Delete("/", boardHandler.Delete)
 					r.Post("/members", boardHandler.InviteMember)
 					r.Post("/columns", columnHandler.Create)
+					r.Get("/ws", wsHandler)
 				})
 			})
 
@@ -138,7 +148,18 @@ func run() error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	return server.Shutdown(shutdownCtx)
+	shutdownErr := server.Shutdown(shutdownCtx)
+
+	// server.Shutdown deliberately does not wait for hijacked connections
+	// (WebSockets) — see NewWSHandler's doc comment — so hub.Run's own
+	// exit (triggered by the same ctx cancellation above) is awaited here
+	// instead, within the same shutdown budget.
+	select {
+	case <-hubDone:
+	case <-shutdownCtx.Done():
+	}
+
+	return shutdownErr
 }
 
 func corsAllowedOrigins() []string {

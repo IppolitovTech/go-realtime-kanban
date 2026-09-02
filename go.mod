@@ -3,10 +3,12 @@ module github.com/IppolitovTech/go-realtime-kanban
 go 1.26
 
 require (
+	github.com/coder/websocket v1.8.15
 	github.com/go-chi/chi/v5 v5.1.0
 	github.com/go-chi/cors v1.2.2
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.6.0
+	go.uber.org/goleak v1.3.0
 )
 
 require (

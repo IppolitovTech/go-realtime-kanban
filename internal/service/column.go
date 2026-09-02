@@ -6,21 +6,27 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/IppolitovTech/go-realtime-kanban/internal/domain"
+	"github.com/IppolitovTech/go-realtime-kanban/internal/realtime"
 	"github.com/IppolitovTech/go-realtime-kanban/internal/repository"
 )
 
 const columnTitleMaxLen = 50
 
 // ColumnService holds column business logic: membership gating plus
-// order_num placement/reordering per ADR 004.
+// order_num placement/reordering per ADR 004. Every mutation publishes a
+// realtime event after it commits — see roadmap.md, Stage 3, on
+// broadcasting an event to every client on the board after each REST
+// change — so WS clients stay in sync without the hub knowing any business
+// logic itself (architecture.md's REST-vs-WebSocket roles section).
 type ColumnService struct {
-	columns repository.ColumnRepository
-	boards  repository.BoardRepository
-	tx      repository.TxManager
+	columns   repository.ColumnRepository
+	boards    repository.BoardRepository
+	tx        repository.TxManager
+	publisher realtime.Publisher
 }
 
-func NewColumnService(columns repository.ColumnRepository, boards repository.BoardRepository, tx repository.TxManager) *ColumnService {
-	return &ColumnService{columns: columns, boards: boards, tx: tx}
+func NewColumnService(columns repository.ColumnRepository, boards repository.BoardRepository, tx repository.TxManager, publisher realtime.Publisher) *ColumnService {
+	return &ColumnService{columns: columns, boards: boards, tx: tx, publisher: publisher}
 }
 
 func (s *ColumnService) Create(ctx context.Context, userID, boardID uuid.UUID, title string) (domain.Column, error) {
@@ -50,6 +56,7 @@ func (s *ColumnService) Create(ctx context.Context, userID, boardID uuid.UUID, t
 	if err != nil {
 		return domain.Column{}, err
 	}
+	s.publisher.Publish(ctx, realtime.NewEvent(realtime.EventColumnCreated, boardID, realtime.NewColumnPayload(column)))
 	return column, nil
 }
 
@@ -71,7 +78,12 @@ func (s *ColumnService) UpdateTitle(ctx context.Context, userID, columnID uuid.U
 	if err := validateTitle("title", title, columnTitleMaxLen); err != nil {
 		return domain.Column{}, err
 	}
-	return s.columns.UpdateTitle(ctx, columnID, title)
+	updated, err := s.columns.UpdateTitle(ctx, columnID, title)
+	if err != nil {
+		return domain.Column{}, err
+	}
+	s.publisher.Publish(ctx, realtime.NewEvent(realtime.EventColumnUpdated, updated.BoardID, realtime.NewColumnPayload(updated)))
+	return updated, nil
 }
 
 func (s *ColumnService) Delete(ctx context.Context, userID, columnID uuid.UUID) error {
@@ -82,7 +94,11 @@ func (s *ColumnService) Delete(ctx context.Context, userID, columnID uuid.UUID) 
 	if err := requireMember(ctx, s.boards, column.BoardID, userID); err != nil {
 		return err
 	}
-	return s.columns.Delete(ctx, columnID)
+	if err := s.columns.Delete(ctx, columnID); err != nil {
+		return err
+	}
+	s.publisher.Publish(ctx, realtime.NewEvent(realtime.EventColumnDeleted, column.BoardID, realtime.NewColumnPayload(column)))
+	return nil
 }
 
 // Move relocates a column within its board to sit right after prevColumnID
@@ -159,5 +175,6 @@ func (s *ColumnService) Move(ctx context.Context, userID, columnID uuid.UUID, pr
 	if err != nil {
 		return domain.Column{}, err
 	}
+	s.publisher.Publish(ctx, realtime.NewEvent(realtime.EventColumnMoved, moved.BoardID, realtime.NewColumnPayload(moved)))
 	return moved, nil
 }

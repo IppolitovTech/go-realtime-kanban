@@ -12,8 +12,60 @@ import {
 import { SortableContext, arrayMove, horizontalListSortingStrategy, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { useCallback, useEffect, useRef, useState, type SubmitEvent } from "react";
 import { api, errorMessage } from "../api/client";
-import type { BoardDetail, ColumnDetail } from "../api/types";
+import { connectBoardSocket, type BoardEvent } from "../api/socket";
+import type { BoardDetail, Card, Column, ColumnDetail } from "../api/types";
 import { ColumnView } from "./ColumnView";
+
+// Replaces any existing entry with the same id (or appends) and keeps the
+// array sorted by order_num. Used everywhere a column/card list is updated
+// — from realtime events and from this tab's own REST responses alike —
+// so the two paths can't drift into different orderings of the same data.
+function upsertByOrder<T extends { id: string; order_num: number }>(items: T[], item: T): T[] {
+  const next = [...items.filter((existing) => existing.id !== item.id), item];
+  next.sort((a, b) => a.order_num - b.order_num);
+  return next;
+}
+
+// Applies one realtime event (see docs/ru/websocket-events.md) to the
+// current columns state. Every case except *.deleted upserts the version
+// from the event, so the same handling covers "created", "updated" and
+// "moved" uniformly — including a card that moved into a different column
+// — and replaying an event this tab already applied via its own REST
+// response is a harmless no-op (same data goes back in).
+function applyBoardEvent(columns: ColumnDetail[], event: BoardEvent): ColumnDetail[] {
+  switch (event.type) {
+    case "column.deleted": {
+      const column = event.data as Column;
+      return columns.filter((c) => c.id !== column.id);
+    }
+    case "column.created":
+    case "column.updated":
+    case "column.moved": {
+      const column = event.data as Column;
+      const existingCards = columns.find((c) => c.id === column.id)?.cards ?? [];
+      return upsertByOrder(columns, { ...column, cards: existingCards });
+    }
+    case "card.deleted": {
+      const card = event.data as Card;
+      return columns.map((c) => ({ ...c, cards: c.cards.filter((existing) => existing.id !== card.id) }));
+    }
+    case "card.created":
+    case "card.updated":
+    case "card.moved": {
+      const card = event.data as Card;
+      return columns.map((c) => {
+        if (c.id !== card.column_id) {
+          return c.cards.some((existing) => existing.id === card.id)
+            ? { ...c, cards: c.cards.filter((existing) => existing.id !== card.id) }
+            : c;
+        }
+        return { ...c, cards: upsertByOrder(c.cards, card) };
+      });
+    }
+    default:
+      return columns;
+  }
+}
 
 interface Props {
   boardId: string;
@@ -45,13 +97,26 @@ export function BoardView({ boardId, onBack }: Props) {
     loadBoard();
   }, [loadBoard]);
 
+  useEffect(() => {
+    return connectBoardSocket(
+      boardId,
+      (event) => setColumns((prev) => applyBoardEvent(prev, event)),
+      loadBoard,
+    );
+  }, [boardId, loadBoard]);
+
   async function handleAddColumn(e: SubmitEvent) {
     e.preventDefault();
     const title = newColumnTitle.trim();
     if (!title) return;
     try {
       const column = await api.createColumn(boardId, title);
-      setColumns((prev) => [...prev, { ...column, cards: [] }]);
+      // upsertByOrder rather than blindly appending: the WS column.created
+      // echo for this same creation can win the race and already be
+      // applied (via applyBoardEvent) by the time this REST response
+      // resolves — see websocket-events.md on why echoes aren't
+      // suppressed, and why every insertion path needs to tolerate them.
+      setColumns((prev) => upsertByOrder(prev, { ...column, cards: [] }));
       setNewColumnTitle("");
     } catch (err) {
       setError(errorMessage(err, "Failed to create column"));
@@ -70,7 +135,8 @@ export function BoardView({ boardId, onBack }: Props) {
   async function handleAddCard(columnId: string, title: string) {
     try {
       const card = await api.createCard(columnId, title, "");
-      setColumns((prev) => prev.map((c) => (c.id === columnId ? { ...c, cards: [...c.cards, card] } : c)));
+      // upsertByOrder — see the matching comment in handleAddColumn.
+      setColumns((prev) => prev.map((c) => (c.id === columnId ? { ...c, cards: upsertByOrder(c.cards, card) } : c)));
     } catch (err) {
       setError(errorMessage(err, "Failed to create card"));
     }
@@ -155,14 +221,27 @@ export function BoardView({ boardId, onBack }: Props) {
 
     if (active.data.current?.type === "column") {
       if (activeId === overId) return;
-      const oldIndex = columns.findIndex((c) => c.id === activeId);
-      const newIndex = columns.findIndex((c) => c.id === overId);
-      if (oldIndex === -1 || newIndex === -1) return;
 
-      const reordered = arrayMove(columns, oldIndex, newIndex);
-      setColumns(reordered);
-      const prevId = reordered[newIndex - 1]?.id ?? null;
-      const nextId = reordered[newIndex + 1]?.id ?? null;
+      // Reorder against the live `prev` (not the `columns` closure from
+      // this render) so a WS event that landed mid-drag isn't clobbered —
+      // and derive prevId/nextId from that same reordered array, so what's
+      // sent to the API always matches what was actually applied.
+      let prevId: string | null = null;
+      let nextId: string | null = null;
+      let moved = false;
+      setColumns((prev) => {
+        const oldIndex = prev.findIndex((c) => c.id === activeId);
+        const newIndex = prev.findIndex((c) => c.id === overId);
+        if (oldIndex === -1 || newIndex === -1) return prev;
+        const next = arrayMove(prev, oldIndex, newIndex);
+        const finalIndex = next.findIndex((c) => c.id === activeId);
+        prevId = next[finalIndex - 1]?.id ?? null;
+        nextId = next[finalIndex + 1]?.id ?? null;
+        moved = true;
+        return next;
+      });
+      if (!moved) return;
+
       try {
         await api.moveColumn(activeId, prevId, nextId);
       } catch (err) {
@@ -172,31 +251,37 @@ export function BoardView({ boardId, onBack }: Props) {
       return;
     }
 
-    const destCol = columns.find((c) => c.cards.some((c2) => c2.id === activeId));
-    if (!destCol) return;
+    const destColId = columns.find((c) => c.cards.some((c2) => c2.id === activeId))?.id;
+    if (!destColId) return;
 
-    const activeIndex = destCol.cards.findIndex((c) => c.id === activeId);
-    const overCardIndex = destCol.cards.findIndex((c) => c.id === overId);
-    let finalCards = destCol.cards;
-    if (overCardIndex >= 0 && overCardIndex !== activeIndex) {
-      finalCards = arrayMove(destCol.cards, activeIndex, overCardIndex);
-      setColumns((prev) => prev.map((c) => (c.id === destCol.id ? { ...c, cards: finalCards } : c)));
-    }
+    // Same live-`prev` treatment as the column branch above.
+    let prevCardId: string | null = null;
+    let nextCardId: string | null = null;
+    let finalIndex = -1;
+    setColumns((prev) => {
+      const col = prev.find((c) => c.id === destColId);
+      if (!col) return prev;
+      const oldIndex = col.cards.findIndex((c) => c.id === activeId);
+      if (oldIndex === -1) return prev;
+      const overIndex = col.cards.findIndex((c) => c.id === overId);
+      const newCards = overIndex >= 0 && overIndex !== oldIndex ? arrayMove(col.cards, oldIndex, overIndex) : col.cards;
+      finalIndex = newCards.findIndex((c) => c.id === activeId);
+      prevCardId = newCards[finalIndex - 1]?.id ?? null;
+      nextCardId = newCards[finalIndex + 1]?.id ?? null;
+      return newCards === col.cards ? prev : prev.map((c) => (c.id === destColId ? { ...c, cards: newCards } : c));
+    });
+    if (finalIndex === -1) return;
 
-    const finalIndex = finalCards.findIndex((c) => c.id === activeId);
-    if (origin && origin.columnId === destCol.id && origin.index === finalIndex) {
+    if (origin && origin.columnId === destColId && origin.index === finalIndex) {
       // Card ended up back where it started (e.g. dropped in place, or
       // dragged out and back) — nothing changed, skip the network call.
       return;
     }
 
-    const prevCardId = finalCards[finalIndex - 1]?.id ?? null;
-    const nextCardId = finalCards[finalIndex + 1]?.id ?? null;
-
     try {
-      const updated = await api.moveCard(activeId, destCol.id, prevCardId, nextCardId);
+      const updated = await api.moveCard(activeId, destColId, prevCardId, nextCardId);
       setColumns((prev) =>
-        prev.map((c) => (c.id === destCol.id ? { ...c, cards: c.cards.map((card) => (card.id === activeId ? updated : card)) } : c)),
+        prev.map((c) => (c.id === destColId ? { ...c, cards: c.cards.map((card) => (card.id === activeId ? updated : card)) } : c)),
       );
     } catch (err) {
       setError(errorMessage(err, "Failed to move card"));

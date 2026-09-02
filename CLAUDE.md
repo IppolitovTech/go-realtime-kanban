@@ -14,6 +14,7 @@ not duplicated here.
   on git log)
 - **Why technology X was chosen over Y** → `docs/ru/adr/*.md`
 - **REST API** → `docs/ru/openapi.yaml`
+- **WebSocket event format** → `docs/ru/websocket-events.md`
 - **Out-of-scope ideas** → `docs/ru/future-ideas.md`
 
 ## Language
