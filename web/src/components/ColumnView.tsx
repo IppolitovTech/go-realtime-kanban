@@ -3,15 +3,18 @@ import { CSS } from "@dnd-kit/utilities";
 import { useState, type SubmitEvent } from "react";
 import type { ColumnDetail } from "../api/types";
 import { CardItem } from "./CardItem";
+import { EditableTitle } from "./EditableTitle";
 
 interface Props {
   column: ColumnDetail;
   onAddCard: (columnId: string, title: string) => void;
   onDeleteCard: (cardId: string) => void;
   onDeleteColumn: (columnId: string) => void;
+  onRenameColumn: (columnId: string, title: string) => void;
+  onRenameCard: (cardId: string, title: string) => void;
 }
 
-export function ColumnView({ column, onAddCard, onDeleteCard, onDeleteColumn }: Props) {
+export function ColumnView({ column, onAddCard, onDeleteCard, onDeleteColumn, onRenameColumn, onRenameCard }: Props) {
   const [newCardTitle, setNewCardTitle] = useState("");
   const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({
     id: column.id,
@@ -43,7 +46,11 @@ export function ColumnView({ column, onAddCard, onDeleteCard, onDeleteColumn }: 
         {...attributes}
         {...listeners}
       >
-        <span>{column.title}</span>
+        <EditableTitle
+          value={column.title}
+          onSave={(title) => onRenameColumn(column.id, title)}
+          maxLength={50}
+        />
         <button
           type="button"
           className="h-5 w-5 cursor-pointer rounded text-base leading-none text-zinc-600 hover:text-red-700 dark:text-zinc-300"
@@ -58,7 +65,7 @@ export function ColumnView({ column, onAddCard, onDeleteCard, onDeleteColumn }: 
       <SortableContext items={column.cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
         <div className="flex min-h-[40px] flex-1 flex-col gap-2 overflow-y-auto p-2.5">
           {column.cards.map((card) => (
-            <CardItem key={card.id} card={card} onDelete={onDeleteCard} />
+            <CardItem key={card.id} card={card} onDelete={onDeleteCard} onRename={onRenameCard} />
           ))}
         </div>
       </SortableContext>

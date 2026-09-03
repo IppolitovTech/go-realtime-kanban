@@ -1,13 +1,15 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Card } from "../api/types";
+import { EditableTitle } from "./EditableTitle";
 
 interface Props {
   card: Card;
   onDelete: (cardId: string) => void;
+  onRename: (cardId: string, title: string) => void;
 }
 
-export function CardItem({ card, onDelete }: Props) {
+export function CardItem({ card, onDelete, onRename }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: card.id,
     data: { type: "card", columnId: card.column_id },
@@ -27,7 +29,13 @@ export function CardItem({ card, onDelete }: Props) {
       {...attributes}
       {...listeners}
     >
-      <div className="font-medium text-zinc-950 dark:text-zinc-100">{card.title}</div>
+      <EditableTitle
+        as="div"
+        value={card.title}
+        onSave={(title) => onRename(card.id, title)}
+        maxLength={255}
+        className="font-medium text-zinc-950 dark:text-zinc-100"
+      />
       {card.description && (
         <div className="mt-1 text-[13px] text-zinc-600 dark:text-zinc-300">{card.description}</div>
       )}
