@@ -15,6 +15,7 @@ import { api, errorMessage } from "../api/client";
 import { connectBoardSocket, type BoardEvent } from "../api/socket";
 import type { BoardDetail, Card, Column, ColumnDetail } from "../api/types";
 import { ColumnView } from "./ColumnView";
+import { EditableTitle } from "./EditableTitle";
 
 // Replaces any existing entry with the same id (or appends) and keeps the
 // array sorted by order_num. Used everywhere a column/card list is updated
@@ -120,6 +121,42 @@ export function BoardView({ boardId, onBack }: Props) {
       setNewColumnTitle("");
     } catch (err) {
       setError(errorMessage(err, "Failed to create column"));
+    }
+  }
+
+  async function handleRenameBoard(title: string) {
+    try {
+      const updated = await api.updateBoard(boardId, title);
+      setBoard((prev) => (prev ? { ...prev, title: updated.title } : prev));
+    } catch (err) {
+      setError(errorMessage(err, "Failed to rename board"));
+    }
+  }
+
+  async function handleRenameColumn(columnId: string, title: string) {
+    try {
+      const column = await api.updateColumn(columnId, title);
+      // A plain title replace, not upsertByOrder: renaming can't change
+      // order_num, so there's nothing to re-sort — and this stays a no-op
+      // if a racing WS echo already applied the same title.
+      setColumns((prev) => prev.map((c) => (c.id === column.id ? { ...c, title: column.title } : c)));
+    } catch (err) {
+      setError(errorMessage(err, "Failed to rename column"));
+    }
+  }
+
+  async function handleRenameCard(cardId: string, title: string) {
+    try {
+      const updated = await api.updateCard(cardId, { title });
+      setColumns((prev) =>
+        prev.map((c) =>
+          c.id === updated.column_id
+            ? { ...c, cards: c.cards.map((card) => (card.id === updated.id ? { ...card, title: updated.title } : card)) }
+            : c,
+        ),
+      );
+    } catch (err) {
+      setError(errorMessage(err, "Failed to rename card"));
     }
   }
 
@@ -301,7 +338,13 @@ export function BoardView({ boardId, onBack }: Props) {
         >
           ← Boards
         </button>
-        <h1 className="m-0 font-semibold text-zinc-950 dark:text-zinc-100">{board.title}</h1>
+        <EditableTitle
+          as="h1"
+          value={board.title}
+          onSave={handleRenameBoard}
+          maxLength={100}
+          className="m-0 font-semibold text-zinc-950 dark:text-zinc-100"
+        />
       </header>
 
       {error && (
@@ -333,6 +376,8 @@ export function BoardView({ boardId, onBack }: Props) {
                 onAddCard={handleAddCard}
                 onDeleteCard={handleDeleteCard}
                 onDeleteColumn={handleDeleteColumn}
+                onRenameColumn={handleRenameColumn}
+                onRenameCard={handleRenameCard}
               />
             ))}
 
