@@ -24,6 +24,12 @@ func RespondDomainError(w http.ResponseWriter, err error) {
 		RespondError(w, http.StatusNotFound, err.Error(), "ERR_USER_NOT_FOUND")
 	case errors.Is(err, domain.ErrNotBoardMember):
 		RespondError(w, http.StatusForbidden, err.Error(), "ERR_NOT_BOARD_MEMBER")
+	case errors.Is(err, domain.ErrInvalidCredentials):
+		RespondError(w, http.StatusUnauthorized, err.Error(), "ERR_INVALID_CREDENTIALS")
+	case errors.Is(err, domain.ErrEmailTaken):
+		RespondError(w, http.StatusConflict, err.Error(), "ERR_EMAIL_TAKEN")
+	case errors.Is(err, domain.ErrUnauthorized):
+		RespondError(w, http.StatusUnauthorized, err.Error(), "ERR_UNAUTHORIZED")
 	case errors.Is(err, domain.ErrValidation):
 		RespondError(w, http.StatusBadRequest, err.Error(), "ERR_VALIDATION")
 	default:

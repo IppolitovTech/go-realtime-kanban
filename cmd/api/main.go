@@ -40,6 +40,12 @@ func run() error {
 		dbURL = "postgres://kanban:kanban@localhost:5432/kanban?sslmode=disable"
 	}
 
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "dev-only-insecure-secret-change-me"
+		slog.Warn("JWT_SECRET not set, using an insecure development default — do not use this in production")
+	}
+
 	pool, err := pgxpool.New(ctx, dbURL)
 	if err != nil {
 		return err
@@ -62,10 +68,12 @@ func run() error {
 	boardService := service.NewBoardService(boardRepo, userRepo, txManager)
 	columnService := service.NewColumnService(columnRepo, boardRepo, txManager, hub)
 	cardService := service.NewCardService(cardRepo, columnRepo, boardRepo, txManager, hub)
+	authService := service.NewAuthService(userRepo, []byte(jwtSecret), 0)
 
 	boardHandler := transporthttp.NewBoardHandler(boardService, columnService, cardService)
 	columnHandler := transporthttp.NewColumnHandler(columnService)
 	cardHandler := transporthttp.NewCardHandler(cardService)
+	authHandler := transporthttp.NewAuthHandler(authService)
 	wsHandler := transporthttp.NewWSHandler(ctx, boardService, hub, corsAllowedOrigins())
 
 	router := chi.NewRouter()
@@ -75,7 +83,7 @@ func run() error {
 		// dev ports/deployments via CORS_ALLOWED_ORIGINS.
 		AllowedOrigins:   corsAllowedOrigins(),
 		AllowedMethods:   []string{http.MethodGet, http.MethodPost, http.MethodPatch, http.MethodDelete},
-		AllowedHeaders:   []string{"Content-Type", "X-User-ID"},
+		AllowedHeaders:   []string{"Content-Type", "Authorization"},
 		AllowCredentials: true,
 	}))
 	router.Get("/health", transporthttp.HealthHandler(pool))
@@ -83,8 +91,11 @@ func run() error {
 	router.Route("/api/v1", func(r chi.Router) {
 		r.Get("/health", transporthttp.HealthHandler(pool))
 
+		r.Post("/auth/register", authHandler.Register)
+		r.Post("/auth/login", authHandler.Login)
+
 		r.Group(func(r chi.Router) {
-			r.Use(transporthttp.DevUserID)
+			r.Use(transporthttp.JWTAuth([]byte(jwtSecret)))
 
 			r.Route("/boards", func(r chi.Router) {
 				r.Get("/", boardHandler.List)

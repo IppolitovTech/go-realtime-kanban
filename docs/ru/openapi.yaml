@@ -4,9 +4,8 @@ info:
   description: |
     REST API для многопользовательской Kanban-доски с real-time синхронизацией.
 
-    Поддерживает два режима аутентификации:
-    1. **X-User-ID** (заглушка для Этапа 1 — CRUD без полноценной авторизации).
-    2. **BearerAuth** (JWT — для Этапа 2 и далее).
+    Все защищённые эндпоинты требуют **BearerAuth** (JWT, полученный через
+    `/auth/register` или `/auth/login`).
   version: 1.0.0
 
 servers:
@@ -85,7 +84,6 @@ paths:
       operationId: listBoards
       security:
         - BearerAuth: []
-        - DevUserIdHeader: []
       responses:
         "200":
           description: Список доступных досок
@@ -103,7 +101,6 @@ paths:
       operationId: createBoard
       security:
         - BearerAuth: []
-        - DevUserIdHeader: []
       requestBody:
         required: true
         content:
@@ -131,7 +128,6 @@ paths:
       operationId: getBoard
       security:
         - BearerAuth: []
-        - DevUserIdHeader: []
       responses:
         "200":
           description: Полные данные доски
@@ -151,7 +147,6 @@ paths:
       operationId: updateBoard
       security:
         - BearerAuth: []
-        - DevUserIdHeader: []
       requestBody:
         required: true
         content:
@@ -179,7 +174,6 @@ paths:
       operationId: deleteBoard
       security:
         - BearerAuth: []
-        - DevUserIdHeader: []
       responses:
         "204":
           description: Доска успешно удалена
@@ -199,7 +193,6 @@ paths:
       operationId: inviteBoardMember
       security:
         - BearerAuth: []
-        - DevUserIdHeader: []
       requestBody:
         required: true
         content:
@@ -236,7 +229,6 @@ paths:
       operationId: createColumn
       security:
         - BearerAuth: []
-        - DevUserIdHeader: []
       requestBody:
         required: true
         content:
@@ -266,7 +258,6 @@ paths:
       operationId: updateColumn
       security:
         - BearerAuth: []
-        - DevUserIdHeader: []
       requestBody:
         required: true
         content:
@@ -292,7 +283,6 @@ paths:
       operationId: deleteColumn
       security:
         - BearerAuth: []
-        - DevUserIdHeader: []
       responses:
         "204":
           description: Колонка удалена
@@ -314,7 +304,6 @@ paths:
       operationId: moveColumn
       security:
         - BearerAuth: []
-        - DevUserIdHeader: []
       requestBody:
         required: true
         content:
@@ -344,7 +333,6 @@ paths:
       operationId: createCard
       security:
         - BearerAuth: []
-        - DevUserIdHeader: []
       requestBody:
         required: true
         content:
@@ -374,7 +362,6 @@ paths:
       operationId: updateCard
       security:
         - BearerAuth: []
-        - DevUserIdHeader: []
       requestBody:
         required: true
         content:
@@ -400,7 +387,6 @@ paths:
       operationId: deleteCard
       security:
         - BearerAuth: []
-        - DevUserIdHeader: []
       responses:
         "204":
           description: Карточка удалена
@@ -420,7 +406,6 @@ paths:
       operationId: moveCard
       security:
         - BearerAuth: []
-        - DevUserIdHeader: []
       requestBody:
         required: true
         content:
@@ -447,12 +432,7 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: Настоящий JWT токен для авторизованных эндпоинтов (Этап 2+)
-    DevUserIdHeader:
-      type: apiKey
-      in: header
-      name: X-User-ID
-      description: Временный заголовок с UUID пользователя для работы на Этапе 1 (до появления JWT)
+      description: JWT токен, полученный через /auth/register или /auth/login
 
   parameters:
     BoardIdParam:

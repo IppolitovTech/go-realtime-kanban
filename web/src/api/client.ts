@@ -1,12 +1,8 @@
-import type { Board, BoardDetail, BoardMember, Card, Column } from "./types";
+import { clearSession, getToken } from "../auth/token";
+import type { AuthResponse, Board, BoardDetail, BoardMember, Card, Column } from "./types";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080/api/v1";
 
-// No X-User-ID header is sent: Stage 1 has no registration yet (see
-// architecture.md, "Заглушка пользователя на Этапе 1"), and the API
-// already falls back to its seed user when the header is absent. Stage 2
-// swaps this client for one that attaches a real bearer token — nothing
-// else here changes.
 export class ApiError extends Error {
   status: number;
 
@@ -21,11 +17,16 @@ export function errorMessage(err: unknown, fallback: string): string {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: { "Content-Type": "application/json", ...options.headers },
-  });
+  const headers = new Headers(options.headers);
+  headers.set("Content-Type", "application/json");
+  const token = getToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+
+  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
   if (!res.ok) {
+    // A 401 means the stored token is missing/expired/invalid — drop it so
+    // the app falls back to the login screen instead of retrying forever.
+    if (res.status === 401) clearSession();
     const body: { error?: string } = await res.json().catch(() => ({}));
     throw new ApiError(res.status, body.error ?? res.statusText);
   }
@@ -36,6 +37,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
+  register: (email: string, password: string, name: string) =>
+    request<AuthResponse>("/auth/register", { method: "POST", body: JSON.stringify({ email, password, name }) }),
+  login: (email: string, password: string) =>
+    request<AuthResponse>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
+
   listBoards: () => request<Board[]>("/boards"),
   createBoard: (title: string) => request<Board>("/boards", { method: "POST", body: JSON.stringify({ title }) }),
   getBoard: (id: string) => request<BoardDetail>(`/boards/${id}`),

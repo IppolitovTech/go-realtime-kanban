@@ -2,9 +2,32 @@
 
 Multiplayer Kanban board with real-time synchronization of changes between participants.
 
+## Quick start
+
+```sh
+docker compose up -d
+```
+
+Opens the API on `localhost:8080` and the frontend on `localhost:5173`
+(migrations run automatically before the API starts — see "Running the
+project" below for the local, non-Docker dev workflow). If a port is
+already taken, copy [`.env.example`](.env.example) to `.env` and override
+`POSTGRES_PORT`/`API_PORT`/`WEB_PORT` there.
+
+No need to register — log in with the seeded demo account
+(`internal/repository/postgres/migrations/000003_demo_user.up.sql`):
+
+```
+email:    demo@example.local
+password: demo12345
+```
+
 ## Status
 
-Stage 0 done (project skeleton: HTTP server, DB connectivity, migrations, sqlc wired up). No domain features yet — see the roadmap below.
+Stages 0-3 done: CRUD for boards/columns/cards end-to-end (API + frontend),
+JWT auth, and real-time sync over WebSocket. See
+[`docs/ru/roadmap.md`](docs/ru/roadmap.md) for the full stage-by-stage
+breakdown and what's next.
 
 ## Docs
 

@@ -142,6 +142,22 @@ func (r *memUserRepo) GetByEmail(ctx context.Context, email string) (domain.User
 	return domain.User{}, domain.ErrUserNotFound
 }
 
+// Create mirrors the real repository's unique-email constraint (see
+// internal/repository/postgres/user.go), so AuthService.Register's
+// duplicate-email path is exercised the same way against both.
+func (r *memUserRepo) Create(ctx context.Context, user domain.User) (domain.User, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, u := range r.users {
+		if u.Email == user.Email {
+			return domain.User{}, domain.ErrEmailTaken
+		}
+	}
+	user.ID = uuid.New()
+	r.users[user.ID] = user
+	return user, nil
+}
+
 type memColumnRepo struct {
 	mu      sync.Mutex
 	columns map[uuid.UUID]domain.Column
