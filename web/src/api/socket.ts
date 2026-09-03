@@ -1,5 +1,6 @@
 // Realtime board events — see docs/ru/websocket-events.md for the wire
 // format this mirrors.
+import { getToken } from "../auth/token";
 import type { Card, Column } from "./types";
 
 export type BoardEventType =
@@ -26,7 +27,13 @@ const MAX_RECONNECT_DELAY_MS = 30000;
 function boardSocketURL(boardId: string): string {
   const httpBase = new URL(API_BASE, window.location.href);
   const wsProtocol = httpBase.protocol === "https:" ? "wss:" : "ws:";
-  return `${wsProtocol}//${httpBase.host}${httpBase.pathname.replace(/\/$/, "")}/boards/${boardId}/ws`;
+  const url = new URL(`${wsProtocol}//${httpBase.host}${httpBase.pathname.replace(/\/$/, "")}/boards/${boardId}/ws`);
+  // The browser WebSocket API can't set an Authorization header on the
+  // handshake request, so the JWT goes in the query string instead — see
+  // internal/transport/http.JWTAuth and docs/ru/adr/005-jwt-vs-sessions.md.
+  const token = getToken();
+  if (token) url.searchParams.set("token", token);
+  return url.toString();
 }
 
 // connectBoardSocket subscribes to boardId's realtime events and keeps

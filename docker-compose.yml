@@ -6,7 +6,7 @@ services:
       POSTGRES_PASSWORD: kanban
       POSTGRES_DB: kanban
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -25,6 +25,9 @@ services:
     environment:
       DATABASE_URL: postgres://kanban:kanban@postgres:5432/kanban?sslmode=disable
       HTTP_ADDR: ":8080"
+      # No default on purpose — see ADR 005. Set in .env (gitignored),
+      # never in this tracked file.
+      JWT_SECRET: ${JWT_SECRET}
     ports:
       - "${API_PORT:-8080}:8080"
 

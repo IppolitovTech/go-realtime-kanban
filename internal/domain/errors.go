@@ -15,6 +15,12 @@ var (
 	ErrUserNotFound   = errors.New("user not found")
 	ErrNotBoardMember = errors.New("user is not a board member")
 
+	// Auth sentinels — see internal/service/auth.go and
+	// docs/ru/adr/005-jwt-vs-sessions.md.
+	ErrInvalidCredentials = errors.New("invalid email or password")
+	ErrEmailTaken         = errors.New("email already registered")
+	ErrUnauthorized       = errors.New("missing or invalid authentication token")
+
 	// ErrValidation is the sentinel every *ValidationError unwraps to, so
 	// the transport layer can map the whole family with one errors.Is
 	// check instead of enumerating field-specific errors.

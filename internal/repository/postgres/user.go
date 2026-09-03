@@ -2,8 +2,10 @@ package postgres
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/IppolitovTech/go-realtime-kanban/internal/domain"
@@ -37,11 +39,28 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (domain.U
 	return userFromRow(row), nil
 }
 
+func (r *UserRepository) Create(ctx context.Context, user domain.User) (domain.User, error) {
+	row, err := queriesFor(ctx, r.pool).CreateUser(ctx, generated.CreateUserParams{
+		Email:        user.Email,
+		Name:         user.Name,
+		PasswordHash: user.PasswordHash,
+	})
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation {
+			return domain.User{}, domain.ErrEmailTaken
+		}
+		return domain.User{}, err
+	}
+	return userFromRow(row), nil
+}
+
 func userFromRow(row generated.User) domain.User {
 	return domain.User{
-		ID:        fromPgUUID(row.ID),
-		Email:     row.Email,
-		Name:      row.Name,
-		CreatedAt: fromPgTime(row.CreatedAt),
+		ID:           fromPgUUID(row.ID),
+		Email:        row.Email,
+		Name:         row.Name,
+		PasswordHash: row.PasswordHash,
+		CreatedAt:    fromPgTime(row.CreatedAt),
 	}
 }
